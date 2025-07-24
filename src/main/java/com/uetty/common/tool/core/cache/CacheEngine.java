@@ -16,15 +16,14 @@ public interface CacheEngine {
      *
      * @param cacheName      key
      * @param obj            object
-     * @param expirationTime 缓存时间，如果过期时间没有被定义，则默认30分钟，否则按照定义时间
+     * @param expirationMillis 缓存时间，如果过期时间没有被定义，则默认30分钟，否则按照定义时间
      */
-    <T> void put(String cacheName, T obj, Long expirationTime);
+    <T> void put(String cacheName, T obj, Long expirationMillis);
 
 
     /**
      * 取出一个缓存对象
      *
-     * @param cacheName
      */
     <T> T get(String cacheName);
 

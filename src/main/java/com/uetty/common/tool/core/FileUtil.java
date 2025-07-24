@@ -1,13 +1,15 @@
 package com.uetty.common.tool.core;
 
 import java.io.*;
+import java.net.JarURLConnection;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Consumer;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.stream.Collectors;
 
 @SuppressWarnings({"ResultOfMethodCallIgnored", "WeakerAccess", "unused"})
 public class FileUtil {
@@ -638,11 +640,67 @@ public class FileUtil {
 		}
 	}
 
+	/**
+	 * 列出资源目录下的文件列表
+	 */
+	public static List<String> listResourceFiles(String resourcePath, Boolean isDir) throws IOException, URISyntaxException {
+		ClassLoader classLoader = FileUtil.class.getClassLoader();
+		URL url = classLoader.getResource(resourcePath);
+
+		if (url == null) {
+			throw new IllegalArgumentException("目录不存在: " + resourcePath);
+		}
+
+		if (url.getProtocol().equals("file")) {
+			// 运行在 IDE 时 (直接读取文件系统)
+			File file = new File(url.toURI());
+			final File[] files = file.listFiles();
+			if (files == null) {
+				return new ArrayList<>();
+			}
+			return Arrays.stream(files)
+					.filter(item -> isDir == null || (isDir && item.isDirectory()) || (!isDir && !item.isDirectory()))
+					.map(File::getName)
+					.collect(Collectors.toList());
+		} else if (url.getProtocol().equals("jar")) {
+			// 运行在 JAR 内部
+			return listFilesFromJar(url, resourcePath, isDir);
+		} else {
+			throw new UnsupportedOperationException("不支持的协议: " + url.getProtocol());
+		}
+	}
+
+	private static List<String> listFilesFromJar(URL jarUrl, String resourcePath, Boolean isDir) throws IOException {
+		System.out.println("list from jar");
+		String resourcePath2 = resourcePath.endsWith("/") ? resourcePath.substring(0, resourcePath.length() - 1) : resourcePath;
+		JarURLConnection jarURLConnection = (JarURLConnection) jarUrl.openConnection();
+		JarFile jarFile = jarURLConnection.getJarFile();
+
+		return jarFile.stream()
+				.map(JarEntry::getName)
+				.filter(name -> name.startsWith(resourcePath2 + "/") && !name.equals(resourcePath2 + "/"))
+				.filter(name -> isDir == null || (isDir && name.endsWith("/")) || (!isDir && !name.endsWith("/")))
+				.map(name -> name.substring(resourcePath2.length() + 1)) // 去掉路径前缀
+				.map(FileUtil::removeEndSlash)
+				.filter(name -> !name.contains("/"))
+				.collect(Collectors.toList());
+	}
+
+	private static String removeEndSlash(String name) {
+		char[] chars = name.toCharArray();
+		for (int i = chars.length - 1; i >= 0; i--) {
+			if (chars[i] != '/') {
+				return name.substring(0, i + 1);
+			}
+		}
+		return name;
+	}
+
 	public static void main(String[] args) throws IOException {
-		System.out.println("正常JPG文件头魔数：" + readMagicNumber(new File("/Users/vince/temp/4849bdc1-2844-48db-855d-9cd5a6cc31b4.png"), 8).toUpperCase());
+		System.out.println("正常JPG文件头魔数：" + readMagicNumber(new File("/Users/xxx/temp/4849bdc1-2844-48db-855d-9cd5a6cc31b4.png"), 8).toUpperCase());
 		System.out.println();
-		System.out.println("正常Webp文件头魔数：" + readMagicNumber(new File("/Users/vince/temp/ar2me-0i9j5.webp"), 8).toUpperCase());
+		System.out.println("正常Webp文件头魔数：" + readMagicNumber(new File("/Users/xxx/temp/ar2me-0i9j5.webp"), 8).toUpperCase());
 		System.out.println();
-		System.out.println("上传的文件文件头：" + readMagicNumber(new File("/Users/vince/temp/c2fbe7526b32455792905e599f42dae0.jpeg"), 8).toUpperCase());
+		System.out.println("上传的文件文件头：" + readMagicNumber(new File("/Users/xxx/temp/c2fbe7526b32455792905e599f42dae0.jpeg"), 8).toUpperCase());
 	}
 }

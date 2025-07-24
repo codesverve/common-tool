@@ -4,6 +4,9 @@ import com.uetty.common.tool.core.cache.CacheEngine;
 import com.uetty.common.tool.core.cache.CacheManager;
 import com.uetty.common.tool.core.cache.mo.Lock;
 import com.uetty.common.tool.core.string.StringUtil;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,6 +23,7 @@ import java.util.stream.Collectors;
 /**
  * 本地内存缓存引擎（仅适用于单实例）
  */
+@Slf4j
 public class MemoryCacheEngine implements CacheEngine {
 
     @Override
@@ -37,7 +41,7 @@ public class MemoryCacheEngine implements CacheEngine {
     /**
      * 默认每个缓存生效时间30分钟
      */
-    public static final long EXPIRE_SECONDS = 30 * 60 * 1000L;
+    public static final long EXPIRE_SECONDS = 30 * 60;
 
     /**
      * 缓存自动清理单线程定时线程池
@@ -74,7 +78,7 @@ public class MemoryCacheEngine implements CacheEngine {
             return;
         }
         if (expirationMillis == null) {
-            expirationMillis = EXPIRE_SECONDS;
+            expirationMillis = EXPIRE_SECONDS * 1000L;
         }
 
         AutoExpireData<T> cache = new AutoExpireData<>(obj);
@@ -86,8 +90,6 @@ public class MemoryCacheEngine implements CacheEngine {
     /**
      * 取出一个缓存对象
      *
-     * @param cacheName
-     * @return
      */
     @SuppressWarnings("unchecked")
     @Override
@@ -116,7 +118,6 @@ public class MemoryCacheEngine implements CacheEngine {
     /**
      * 删除某个缓存
      *
-     * @param cacheName
      */
     @Override
     public void remove(String cacheName) {
@@ -157,8 +158,6 @@ public class MemoryCacheEngine implements CacheEngine {
      * 若不存在，则返回false
      * 若存在，检查其是否已过有效期，如果已经过了则删除该缓存并返回false
      *
-     * @param cacheName
-     * @return
      */
     @Override
     public boolean checkExists(String cacheName) {
@@ -197,8 +196,10 @@ public class MemoryCacheEngine implements CacheEngine {
 
         private final T data;
 
+        @Getter
         private final long createTime;
 
+        @Setter
         private long autoExpiredMillis = EXPIRE_SECONDS * 1000;
 
 
@@ -207,24 +208,12 @@ public class MemoryCacheEngine implements CacheEngine {
             this.createTime = System.currentTimeMillis();
         }
 
-        public long getAutoExpiredMillis() {
-            return autoExpiredMillis;
-        }
-
-        public void setAutoExpiredMillis(long autoExpiredMillis) {
-            this.autoExpiredMillis = autoExpiredMillis;
-        }
-
         public long getAutoExpiredSeconds() {
             return this.autoExpiredMillis / 1000;
         }
 
         public void setAutoExpiredSeconds(long autoExpiredSeconds) {
             this.autoExpiredMillis = autoExpiredSeconds * 1000;
-        }
-
-        public long getCreateTime() {
-            return createTime;
         }
 
         public boolean checkAlive() {
@@ -268,7 +257,7 @@ public class MemoryCacheEngine implements CacheEngine {
                 }
 
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error("[clear] 清理异常", e);
             }
         }
     }
@@ -279,7 +268,6 @@ public class MemoryCacheEngine implements CacheEngine {
      * @param autoReleaseSeconds 自动释放的秒数（防止宕机未释放）
      * @return 锁对象（如果未获取到锁，返回null）
      */
-    @SuppressWarnings("resource")
     public Lock lock(String key, int autoReleaseSeconds) {
         Lock lock = new MemoryCacheLock();
         lock.setKey(getLockKey(key));
