@@ -8,10 +8,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 反射工具类
@@ -21,6 +18,8 @@ import java.util.Set;
 public class ReflectUtil {
 	
 	private static final Logger logger = LoggerFactory.getLogger(ReflectUtil.class);
+
+	private static final WeakHashMap<Class<?>, Field[]> FIELDS_CACHE = new WeakHashMap<>();
 
 	private static String getterName(String fieldName) {
 		return "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
@@ -71,7 +70,7 @@ public class ReflectUtil {
 		throw new RuntimeException("field[" + fieldName + "] not found in " + obj);
 	}
 	
-	public static List<String> getFields(Object obj) {
+	public static List<String> getFieldNames(Object obj) {
 		Class<?> clz = obj.getClass();
 		Field[] fields = clz.getDeclaredFields();
 		List<String> list = new ArrayList<>();
@@ -80,6 +79,30 @@ public class ReflectUtil {
 			list.add(name);
 		}
 		return list;
+	}
+
+	public static Field[] getFields(Object obj) {
+		Class<?> clz = obj.getClass();
+		Field[] fields = FIELDS_CACHE.get(clz);
+		if (fields != null) {
+			return fields;
+		}
+		synchronized (FIELDS_CACHE) {
+			return FIELDS_CACHE.computeIfAbsent(clz, key -> getFieldsDirectly(key, true));
+		}
+	}
+
+	public static Field[] getFieldsDirectly(Class<?> beanClass, boolean withSuperClassFields) throws SecurityException {
+		List<Field> allFields = new ArrayList<>();
+		Class<?> searchType = beanClass;
+		Field[] declaredFields;
+		while (searchType != null) {
+			declaredFields = searchType.getDeclaredFields();
+			allFields.addAll(Arrays.asList(declaredFields));
+			searchType = withSuperClassFields ? searchType.getSuperclass() : null;
+		}
+
+		return allFields.toArray(new Field[0]);
 	}
 	
 	public static Class<?> getFieldClass(Object obj, String fieldName) {
